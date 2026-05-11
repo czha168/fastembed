@@ -37,6 +37,8 @@ pillow = [
 ]
 mmh3 = ">=4.1.0,<6.0.0"
 py-rust-stemmers = "^0.1.0"
+mlx = {version = ">=0.15.0", optional = true}
+safetensors = {version = ">=0.4.0", optional = true}
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.2"
@@ -72,8 +74,5 @@ typeCheckingMode = "strict"
 [tool.ruff]
 line-length = 99
 
-[project.optional-dependencies]
-mlx = [
-    "mlx>=0.15.0",
-    "safetensors>=0.4.0",
-]
+[tool.poetry.extras]
+mlx = ["mlx", "safetensors"]
