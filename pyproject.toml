@@ -71,3 +71,9 @@ typeCheckingMode = "strict"
 
 [tool.ruff]
 line-length = 99
+
+[project.optional-dependencies]
+mlx = [
+    "mlx>=0.15.0",
+    "safetensors>=0.4.0",
+]
