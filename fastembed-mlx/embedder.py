@@ -61,7 +61,6 @@ class MLXTextEmbedding:
 
 
 # --- Added MLX Sparse Expansion Engine ---
-
 class MLXSparseTextEmbedding(SparseTextEmbeddingBase):
     def __init__(
         self, 
@@ -73,8 +72,6 @@ class MLXSparseTextEmbedding(SparseTextEmbeddingBase):
     ):
         self.model_name = model_name
         self.batch_size = batch_size
-        
-        # Matches your exact model initialization and tokenizer structures
         self.model, self.config = get_mlx_model(model_name, compile, cache_dir)
         self.tokenizer = MLXTokenizer(model_name, self.config.max_position_embeddings)
 
@@ -88,38 +85,24 @@ class MLXSparseTextEmbedding(SparseTextEmbeddingBase):
         if isinstance(documents, str):
             documents = [documents]
             
-        # Fallback to local class configuration if defaults are requested
         b_size = batch_size or self.batch_size
-        
-        # Convert an iterable smoothly to an accessible sequence loop
         docs_list = list(documents) if not isinstance(documents, list) else documents
 
         for i in range(0, len(docs_list), b_size):
             batch = docs_list[i:i + b_size]
-            
-            # Use your tokenizer mapping pattern
             encoded = self.tokenizer.encode(batch)
+            
             input_ids = mx.array(encoded["input_ids"])
             attention_mask = mx.array(encoded["attention_mask"])
-            
-            # Forward passage handles token type ids if exposed by BERT configurations
             token_type_ids = mx.array(encoded["token_type_ids"]) if "token_type_ids" in encoded else None
 
-            # 1. Complete Forward pipeline through your custom MlxSpladeModel pass
             sparse_vectors = self.model(input_ids, attention_mask, token_type_ids)
-            
-            # 2. Force graph compilation and evaluate tensors in memory
             mx.eval(sparse_vectors)
             
-            # 3. Pull output to NumPy to parse non-zero active weights
             np_vectors = np.array(sparse_vectors)
-            
             for vec in np_vectors:
-                # Isolate dimensions expanded by the Log-ReLU activation layer (> 0.0)
                 nonzero_indices = np.nonzero(vec)[0]
                 values = vec[nonzero_indices]
-                
-                # Sort dimensions in descending weight order for downstream retrieval matching
                 sort_idx = np.argsort(values)[::-1]
                 
                 yield SparseEmbedding(
