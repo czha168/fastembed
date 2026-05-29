@@ -21,6 +21,8 @@ class ModelConfig:
     attention_probs_dropout_prob: float = 0.1
     type_vocab_size: int = 2
     quantization: Optional[Dict[str, Any]] = None
+    # --- ADD THIS TO SUPPORT THE SPLADE ENTRY ---
+    model_type: str = "dense"
 
 SUPPORTED_MODELS: Dict[str, ModelConfig] = {
     "mlx-community/all-MiniLM-L6-v2-4bit": ModelConfig(
