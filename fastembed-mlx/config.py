@@ -62,6 +62,19 @@ SUPPORTED_MODELS: Dict[str, ModelConfig] = {
         normalization=True,
         quantization={"bits": 4, "group_size": 64},
     ),
+    "prithivida/Splade_PP_en_v1": ModelConfig(
+        model_id="prithivida/Splade_PP_en_v1",
+        dim=30522,          # Sparse output matches vocab size
+        hidden_size=768,    # Standard BERT base dimension
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        max_position_embeddings=512,
+        vocab_size=30522,
+        pooling="splade",   # Flag to trigger your custom max-pooling logic downstream
+        normalization=False,
+        model_type="sparse"
+    ),
 }
 
 def get_config(model_name: str) -> ModelConfig:
