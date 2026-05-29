@@ -85,7 +85,7 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
             )
             model_name = "prithivida/Splade_PP_en_v1"
 
-        # Route directly to your Apple Silicon backend if MLX is available
+        # Route directly to your Apple Silicon backend if MLX package is installed
         if HAS_MLX and model_name.lower() == "prithivida/Splade_PP_en_v1".lower():
             self.model = MlxSparseTextEmbedding(
                 model_name=model_name,
@@ -133,7 +133,8 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
         Returns:
             List of embeddings, one per document
         """
-        yield from self.model.embed(documents, batch_size, parallel, **kwargs)
+        # Forward everything clean to the initialized underlying engine model
+        yield from self.model.embed(documents, batch_size=batch_size, parallel=parallel, **kwargs)
 
     def query_embed(self, query: str | Iterable[str], **kwargs: Any) -> Iterable[SparseEmbedding]:
         """
