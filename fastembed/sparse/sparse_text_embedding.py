@@ -1,8 +1,10 @@
 from typing import Any, Iterable, Sequence, Type
 from dataclasses import asdict
+import warnings
 
 from fastembed.common import OnnxProvider
 from fastembed.common.types import Device
+from fastembed.common.model_description import SparseModelDescription
 from fastembed.sparse.bm25 import Bm25
 from fastembed.sparse.bm42 import Bm42
 from fastembed.sparse.minicoil import MiniCOIL
@@ -11,12 +13,22 @@ from fastembed.sparse.sparse_embedding_base import (
     SparseTextEmbeddingBase,
 )
 from fastembed.sparse.splade_pp import SpladePP
-import warnings
-from fastembed.common.model_description import SparseModelDescription
+
+# --- Apple Silicon MLX Extension Intercept ---
+try:
+    from fastembed_mlx.embedder import MlxSparseTextEmbedding
+    HAS_MLX = True
+except ImportError:
+    HAS_MLX = False
 
 
 class SparseTextEmbedding(SparseTextEmbeddingBase):
-    EMBEDDINGS_REGISTRY: list[Type[SparseTextEmbeddingBase]] = [SpladePP, Bm42, Bm25, MiniCOIL]
+    EMBEDDINGS_REGISTRY: list[Type[SparseTextEmbeddingBase]] = [
+        SpladePP,
+        Bm42,
+        Bm25,
+        MiniCOIL,
+    ]
 
     @classmethod
     def list_supported_models(cls) -> list[dict[str, Any]]:
@@ -26,21 +38,21 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
         Returns:
             list[dict[str, Any]]: A list of dictionaries containing the model information.
 
-            Example:
-                ```
-                [
-                    {
-                        "model": "prithvida/SPLADE_PP_en_v1",
-                        "vocab_size": 30522,
-                        "description": "Independent Implementation of SPLADE++ Model for English",
-                        "license": "apache-2.0",
-                        "size_in_GB": 0.532,
-                        "sources": {
-                            "hf": "qdrant/SPLADE_PP_en_v1",
-                        },
-                    }
-                ]
-                ```
+        Example:
+            ```
+            [
+                {
+                    "model": "prithvida/SPLADE_PP_en_v1",
+                    "vocab_size": 30522,
+                    "description": "Independent Implementation of SPLADE++ Model for English",
+                    "license": "apache-2.0",
+                    "size_in_GB": 0.532,
+                    "sources": {
+                        "hf": "qdrant/SPLADE_PP_en_v1",
+                    },
+                }
+            ]
+            ```
         """
         return [asdict(model) for model in cls._list_supported_models()]
 
@@ -63,6 +75,7 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
         **kwargs: Any,
     ):
         super().__init__(model_name, cache_dir, threads, **kwargs)
+
         if model_name.lower() == "prithvida/Splade_PP_en_v1".lower():
             warnings.warn(
                 "The right spelling is prithivida/Splade_PP_en_v1. "
@@ -72,6 +85,16 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
             )
             model_name = "prithivida/Splade_PP_en_v1"
 
+        # Route directly to your Apple Silicon backend if MLX is available
+        if HAS_MLX and model_name.lower() == "prithivida/Splade_PP_en_v1".lower():
+            self.model = MlxSparseTextEmbedding(
+                model_name=model_name,
+                cache_dir=cache_dir,
+                **kwargs
+            )
+            return
+
+        # Fallback to standard registry loop for ONNX/CPU/CUDA processing
         for EMBEDDING_MODEL_TYPE in self.EMBEDDINGS_REGISTRY:
             supported_models = EMBEDDING_MODEL_TYPE._list_supported_models()
             if any(model_name.lower() == model.model.lower() for model in supported_models):
@@ -88,7 +111,7 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
                 return
 
         raise ValueError(
-            f"Model {model_name} is not supported in SparseTextEmbedding."
+            f"Model {model_name} is not supported in SparseTextEmbedding. "
             "Please check the supported models using `SparseTextEmbedding.list_supported_models()`"
         )
 
@@ -101,15 +124,11 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
     ) -> Iterable[SparseEmbedding]:
         """
         Encode a list of documents into list of embeddings.
-        We use mean pooling with attention so that the model can handle variable-length inputs.
 
         Args:
             documents: Iterator of documents or single document to embed
             batch_size: Batch size for encoding -- higher values will use more memory, but be faster
-            parallel:
-                If > 1, data-parallel encoding will be used, recommended for offline encoding of large datasets.
-                If 0, use all available cores.
-                If None, don't use data-parallel processing, use default onnxruntime threading instead.
+            parallel: If > 1, data-parallel encoding will be used. If 0, use all available cores.
 
         Returns:
             List of embeddings, one per document
@@ -121,21 +140,20 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
         Embeds queries
 
         Args:
-            query (Union[str, Iterable[str]]): The query to embed, or an iterable e.g. list of queries.
+            query (Union[str, Iterable[str]]): The query to embed, or an iterable of queries.
 
         Returns:
             Iterable[SparseEmbedding]: The sparse embeddings.
         """
         yield from self.model.query_embed(query, **kwargs)
 
-    def token_count(
-        self, texts: str | Iterable[str], batch_size: int = 1024, **kwargs: Any
-    ) -> int:
-        """Returns the number of tokens in the texts.
+    def token_count(self, texts: str | Iterable[str], batch_size: int = 1024, **kwargs: Any) -> int:
+        """
+        Returns the number of tokens in the texts.
 
         Args:
-            texts (str | Iterable[str]): The list of texts to embed.
-            batch_size (int): Batch size for encoding
+            texts (str | Iterable[str]): The list of texts to check.
+            batch_size (int): Batch size for tokenization
 
         Returns:
             int: Sum of number of tokens in the texts.
