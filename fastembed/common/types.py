@@ -13,6 +13,12 @@ class Device(str, Enum):
     AUTO = "auto"
 
 
+class Backend(str, Enum):
+    CUDA = "cuda"
+    MLX = "mlx"
+    CPU = "cpu"
+
+
 PathInput: TypeAlias = str | Path
 ImageInput: TypeAlias = PathInput | Image.Image
 
