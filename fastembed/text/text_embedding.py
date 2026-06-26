@@ -3,6 +3,7 @@ from typing import Any, Iterable, Sequence, Type
 from dataclasses import asdict
 
 from fastembed.common.types import NumpyArray, OnnxProvider, Device
+from fastembed.common.hardware import should_use_mlx
 from fastembed.text.clip_embedding import CLIPOnnxEmbedding
 from fastembed.text.custom_text_embedding import CustomTextEmbedding
 from fastembed.text.pooled_normalized_embedding import PooledNormalizedEmbedding
@@ -96,6 +97,11 @@ class TextEmbedding(TextEmbeddingBase):
                 UserWarning,
                 stacklevel=2,
             )
+        if should_use_mlx(model_name, cuda, providers):
+            from fastembed_mlx.embedder import MLXTextEmbedding
+            self.model = MLXTextEmbedding(model_name=model_name)
+            return
+
         for EMBEDDING_MODEL_TYPE in self.EMBEDDINGS_REGISTRY:
             supported_models = EMBEDDING_MODEL_TYPE._list_supported_models()
             if any(model_name.lower() == model.model.lower() for model in supported_models):
