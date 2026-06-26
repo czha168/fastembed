@@ -4,6 +4,7 @@ import warnings
 
 from fastembed.common import OnnxProvider
 from fastembed.common.types import Device
+from fastembed.common.hardware import should_use_mlx
 from fastembed.common.model_description import SparseModelDescription
 from fastembed.sparse.bm25 import Bm25
 from fastembed.sparse.bm42 import Bm42
@@ -13,13 +14,6 @@ from fastembed.sparse.sparse_embedding_base import (
     SparseTextEmbeddingBase,
 )
 from fastembed.sparse.splade_pp import SpladePP
-
-# --- Apple Silicon MLX Extension Intercept ---
-try:
-    from fastembed_mlx.embedder import MlxSparseTextEmbedding
-    HAS_MLX = True
-except ImportError:
-    HAS_MLX = False
 
 
 class SparseTextEmbedding(SparseTextEmbeddingBase):
@@ -85,8 +79,8 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
             )
             model_name = "prithivida/Splade_PP_en_v1"
 
-        # Route directly to your Apple Silicon backend if MLX package is installed
-        if HAS_MLX and model_name.lower() == "prithivida/Splade_PP_en_v1".lower():
+        if should_use_mlx(model_name, cuda, providers):
+            from fastembed_mlx.embedder import MlxSparseTextEmbedding
             self.model = MlxSparseTextEmbedding(
                 model_name=model_name,
                 cache_dir=cache_dir,
@@ -94,7 +88,6 @@ class SparseTextEmbedding(SparseTextEmbeddingBase):
             )
             return
 
-        # Fallback to standard registry loop for ONNX/CPU/CUDA processing
         for EMBEDDING_MODEL_TYPE in self.EMBEDDINGS_REGISTRY:
             supported_models = EMBEDDING_MODEL_TYPE._list_supported_models()
             if any(model_name.lower() == model.model.lower() for model in supported_models):
