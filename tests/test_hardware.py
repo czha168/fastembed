@@ -83,7 +83,10 @@ def test_get_mlx_supported_models_available():
 def test_get_mlx_supported_models_unavailable():
     from fastembed.common import hardware
     hardware._cached_mlx_models = hardware._sentinel
-    with patch.dict("sys.modules", {}):
+    # Set modules to None to make Python treat them as unimportable, since
+    # fastembed_mlx is now a real installed package and patch.dict({}) alone
+    # would allow it to be re-imported.
+    with patch.dict("sys.modules", {"fastembed_mlx": None, "fastembed_mlx.config": None}):
         result = get_mlx_supported_models()
     assert result is None
     hardware._cached_mlx_models = hardware._sentinel
@@ -140,3 +143,63 @@ def test_should_use_mlx_no_mlx_models():
     with patch("fastembed.common.hardware.detect_backend", return_value=Backend.MLX), \
          patch("fastembed.common.hardware.get_mlx_supported_models", return_value=None):
         assert should_use_mlx("BAAI/bge-small-en-v1.5", Device.AUTO, None) is False
+
+
+def test_bge_small_bf16_registered_and_routable():
+    """The full-precision MLX BGE-small model must be registered so it routes to MLX."""
+    from fastembed.common import hardware
+    hardware._cached_mlx_models = hardware._sentinel
+    mlx_models = get_mlx_supported_models()
+    assert "mlx-community/bge-small-en-v1.5-bf16" in mlx_models
+    with patch("fastembed.common.hardware.detect_backend", return_value=Backend.MLX):
+        assert should_use_mlx("mlx-community/bge-small-en-v1.5-bf16", Device.AUTO, None) is True
+    hardware._cached_mlx_models = hardware._sentinel
+
+
+def test_all_registered_pooling_strategies_are_supported():
+    """Every pooling value declared in SUPPORTED_MODELS must be handled by pool_and_normalize."""
+    from fastembed_mlx.config import SUPPORTED_MODELS
+    from fastembed_mlx.pooling import pool_and_normalize
+
+    supported = {"mean", "cls", "first", "max", "splade"}
+    declared = {cfg.pooling for cfg in SUPPORTED_MODELS.values()}
+    # "splade" is handled by the SPLADE model class itself, not pool_and_normalize,
+    # so it is exempt from this check.
+    unhandled = (declared - supported) - {"splade"}
+    assert not unhandled, f"Pooling strategies declared but never handled: {unhandled}"
+
+
+def test_onnx_default_model_routes_to_mlx_via_alias():
+    """The ONNX default 'BAAI/bge-small-en-v1.5' must route to MLX via alias."""
+    from fastembed.common import hardware
+    hardware._cached_mlx_models = hardware._sentinel
+    assert "BAAI/bge-small-en-v1.5" in get_mlx_supported_models()
+    with patch("fastembed.common.hardware.detect_backend", return_value=Backend.MLX):
+        assert should_use_mlx("BAAI/bge-small-en-v1.5", Device.AUTO, None) is True
+    hardware._cached_mlx_models = hardware._sentinel
+
+
+def test_resolve_mlx_model_name():
+    """Aliased names resolve to their native MLX equivalents; others pass through."""
+    from fastembed_mlx.config import resolve_mlx_model_name
+    assert resolve_mlx_model_name("BAAI/bge-small-en-v1.5") == "mlx-community/bge-small-en-v1.5-bf16"
+    # Non-aliased names pass through unchanged
+    assert resolve_mlx_model_name("mlx-community/all-MiniLM-L6-v2-4bit") == "mlx-community/all-MiniLM-L6-v2-4bit"
+    assert resolve_mlx_model_name("unknown/model") == "unknown/model"
+
+
+def test_resolve_mlx_model_name_reexported_from_hardware():
+    """hardware.resolve_mlx_model_name mirrors fastembed_mlx.config.resolve_mlx_model_name."""
+    from fastembed.common.hardware import resolve_mlx_model_name
+    assert resolve_mlx_model_name("BAAI/bge-small-en-v1.5") == "mlx-community/bge-small-en-v1.5-bf16"
+
+
+def test_mlx_text_embedding_default_matches_onnx_default_resolution():
+    """Standalone MLXTextEmbedding default resolves to the same model as the ONNX default alias."""
+    import inspect
+    from fastembed_mlx.embedder import MLXTextEmbedding
+    from fastembed_mlx.config import resolve_mlx_model_name
+
+    mlx_default = inspect.signature(MLXTextEmbedding.__init__).parameters["model_name"].default
+    onnx_default_resolved = resolve_mlx_model_name("BAAI/bge-small-en-v1.5")
+    assert mlx_default == onnx_default_resolved == "mlx-community/bge-small-en-v1.5-bf16"

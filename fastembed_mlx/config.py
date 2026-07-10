@@ -64,6 +64,20 @@ SUPPORTED_MODELS: Dict[str, ModelConfig] = {
         normalization=True,
         quantization={"bits": 4, "group_size": 64},
     ),
+    # Full-precision (bf16) MLX conversion of BAAI/bge-small-en-v1.5; same
+    # architecture and CLS pooling as the 4-bit variant above, without quantization.
+    "mlx-community/bge-small-en-v1.5-bf16": ModelConfig(
+        model_id="mlx-community/bge-small-en-v1.5-bf16",
+        dim=384,
+        hidden_size=384,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=1536,
+        max_position_embeddings=512,
+        vocab_size=30522,
+        pooling="first",  # BGE uses CLS token pooling ("first") instead of mean pooling
+        normalization=True,
+    ),
     "prithivida/Splade_PP_en_v1": ModelConfig(
         model_id="prithivida/Splade_PP_en_v1",
         dim=30522,          # Sparse output matches vocab size
@@ -79,7 +93,21 @@ SUPPORTED_MODELS: Dict[str, ModelConfig] = {
     ),
 }
 
+# Maps ONNX/PyTorch model names to their native MLX equivalents so that the
+# fastembed default model (and other names without a direct MLX repo) route to
+# the best available MLX model instead of falling back to ONNX on Apple Silicon.
+MLX_ALIASES: Dict[str, str] = {
+    "BAAI/bge-small-en-v1.5": "mlx-community/bge-small-en-v1.5-bf16",
+}
+
+
+def resolve_mlx_model_name(model_name: str) -> str:
+    """Return the native MLX model id for a (possibly aliased) model name."""
+    return MLX_ALIASES.get(model_name, model_name)
+
+
 def get_config(model_name: str) -> ModelConfig:
+    model_name = resolve_mlx_model_name(model_name)
     if model_name not in SUPPORTED_MODELS:
         raise ValueError(f"Model '{model_name}' not supported. Available: {list(SUPPORTED_MODELS.keys())}")
     return SUPPORTED_MODELS[model_name]

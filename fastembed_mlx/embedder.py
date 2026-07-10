@@ -1,5 +1,5 @@
 """ MLXTextEmbedding: FastEmbed-compatible API for Apple Silicon. """
-from typing import Iterator, List, Optional
+from typing import Any, Iterable, Iterator, List, Optional
 import numpy as np
 import mlx.core as mx
 
@@ -10,13 +10,13 @@ from .pooling import pool_and_normalize
 
 # Imports required for the Sparse/SPLADE extension
 from fastembed.sparse.sparse_embedding_base import SparseTextEmbeddingBase
-from fastembed.common.models import SparseEmbedding
+from fastembed.sparse.sparse_embedding_base import SparseEmbedding
 
 
 class MLXTextEmbedding:
     def __init__(
         self,
-        model_name: str = "mlx-community/all-MiniLM-L6-v2-4bit",
+        model_name: str = "mlx-community/bge-small-en-v1.5-bf16",
         batch_size: int = 32,
         cache_dir: str = "~/.cache/fastembed_mlx",
         compile: bool = True,
@@ -26,8 +26,19 @@ class MLXTextEmbedding:
         self.model, self.config = get_mlx_model(model_name, compile, cache_dir)
         self.tokenizer = MLXTokenizer(model_name, self.config.max_position_embeddings)
 
-    def embed(self, texts: List[str], batch_size: Optional[int] = None) -> Iterator[np.ndarray]:
+    def embed(
+        self,
+        texts: str | Iterable[str],
+        batch_size: Optional[int] = None,
+        parallel: Optional[int] = None,
+        **kwargs: Any,
+    ) -> Iterator[np.ndarray]:
+        if isinstance(texts, str):
+            texts = [texts]
+        texts = list(texts)
         batch_size = batch_size or self.batch_size
+        # `parallel` is accepted for API compatibility with TextEmbeddingBase;
+        # MLX runs on a single Metal device, so data-parallelism is not supported.
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             encoded = self.tokenizer.encode(batch)
@@ -121,3 +132,8 @@ class MLXSparseTextEmbedding(SparseTextEmbeddingBase):
 
     def __repr__(self) -> str:
         return f"MLXSparseTextEmbedding(model=\"{self.model_name}\", backend=mlx)"
+
+
+# Backward-compatible alias; the class is defined as MLXSparseTextEmbedding,
+# but some call sites import it as MlxSparseTextEmbedding.
+MlxSparseTextEmbedding = MLXSparseTextEmbedding

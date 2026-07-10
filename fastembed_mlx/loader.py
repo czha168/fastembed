@@ -62,7 +62,9 @@ def load_model(model_name: str, cache_dir: str = "~/.cache/fastembed_mlx"):
     """
     from .nn.bert import BertModel
     from .nn.quantized_bert import QuantizedBertModel
+    from .config import resolve_mlx_model_name
 
+    model_name = resolve_mlx_model_name(model_name)
     config = get_config(model_name)
     cache_path = Path(cache_dir).expanduser()
     cache_path.mkdir(parents=True, exist_ok=True)

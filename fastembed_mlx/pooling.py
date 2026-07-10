@@ -25,7 +25,7 @@ def l2_normalize(embeddings: mx.array, eps: float = 1e-12) -> mx.array:
 def pool_and_normalize(last_hidden_state: mx.array, attention_mask: mx.array, pooling: str = "mean", normalize: bool = True) -> mx.array:
     if pooling == "mean":
         embeddings = mean_pooling(last_hidden_state, attention_mask)
-    elif pooling == "cls":
+    elif pooling == "cls" or pooling == "first":  # "first" = CLS token pooling
         embeddings = cls_pooling(last_hidden_state)
     elif pooling == "max":
         embeddings = max_pooling(last_hidden_state, attention_mask)

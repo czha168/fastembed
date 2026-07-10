@@ -39,12 +39,26 @@ def get_mlx_supported_models() -> set[str] | None:
         return _cached_mlx_models
 
     try:
-        from fastembed_mlx.config import SUPPORTED_MODELS
-        _cached_mlx_models = set(SUPPORTED_MODELS.keys())
+        from fastembed_mlx.config import SUPPORTED_MODELS, MLX_ALIASES
+        # Include alias keys (e.g. the ONNX default "BAAI/bge-small-en-v1.5")
+        # so that should_use_mlx treats them as MLX-routable.
+        _cached_mlx_models = set(SUPPORTED_MODELS.keys()) | set(MLX_ALIASES.keys())
     except ImportError:
         _cached_mlx_models = None
 
     return _cached_mlx_models
+
+
+def resolve_mlx_model_name(model_name: str) -> str:
+    """Return the native MLX model id for a (possibly aliased) model name.
+
+    Imports lazily so the MLX extra is only required when actually routing to MLX.
+    """
+    try:
+        from fastembed_mlx.config import resolve_mlx_model_name as _resolve
+        return _resolve(model_name)
+    except ImportError:
+        return model_name
 
 
 def should_use_mlx(

@@ -98,8 +98,9 @@ class TextEmbedding(TextEmbeddingBase):
                 stacklevel=2,
             )
         if should_use_mlx(model_name, cuda, providers):
+            from fastembed.common.hardware import resolve_mlx_model_name
             from fastembed_mlx.embedder import MLXTextEmbedding
-            self.model = MLXTextEmbedding(model_name=model_name)
+            self.model = MLXTextEmbedding(model_name=resolve_mlx_model_name(model_name))
             return
 
         for EMBEDDING_MODEL_TYPE in self.EMBEDDINGS_REGISTRY:

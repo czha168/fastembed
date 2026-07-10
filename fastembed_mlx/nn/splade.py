@@ -1,4 +1,4 @@
-# fastembed-mlx/nn/splade.py
+# fastembed_mlx/nn/splade.py
 from typing import Optional
 import mlx.core as mx
 import mlx.nn as nn

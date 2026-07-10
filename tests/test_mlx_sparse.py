@@ -4,7 +4,7 @@ import numpy as np
 import mlx.core as mx
 
 from fastembed.sparse import SparseTextEmbedding
-from fastembed.common.models import SparseEmbedding
+from fastembed.sparse import SparseEmbedding
 from fastembed_mlx.embedder import MlxSparseTextEmbedding  # Case-aligned import
 from fastembed_mlx.nn.splade import MlxSpladeModel
 
